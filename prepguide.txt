@@ -1,0 +1,861 @@
+# This is Franco's study guide
+
+
+    #Deploy a new Resource Group
+    New-AzResourceGroupDeployment
+
+    #Resource Locks
+    Get-AzResourceLock
+    New-AzResourceLock -LockName Name -LockLevel CanNotDelete -ResourceGroupName myresourcegroup
+
+    #ARM Template Structure
+    {
+        "$schema": 	"http://schema.management.                           -> required
+	    azure.com/schemas/2015-01-	01/deploymentTemplate.json#",
+        "contentVersion": "",                                            -> required
+        "parameters": {  },
+        "variables": {  },
+        "functions": [  ],
+        "resources": [  ],                                               -> Required
+        "outputs": {  }
+    }
+
+    #Ports
+    Protocol	Ports
+    RDP	        3389
+    SSH	        22
+    Telnet	    23
+    SQL	        1433/1434
+    RSH	        514
+    PowerShell	5985/5986
+    DNS	        53
+    SMTP        25
+    FTP	        20/21
+    FILESHARE   445
+
+
+    URLs you need to know:
+    Azure:             https://portal.azure.com
+    Webapp :           https://mywebapp.azurewebsites.net
+    Webapp Kudu:       https://mywebapp.scm.azurewebsites.net
+    API Service:       https://myapiservice.azure-api.net
+    Blob service:      http://mystorageaccount.blob.core.windows.net
+    Table service:     http://mystorageaccount.table.core.windows.net
+    Queue service:     http://mystorageaccount.queue.core.windows.net/<queue>
+    File service:      http://mystorageaccount.file.core.windows.net
+    CosmosDB:          https://mycosmosdb.documents.azure.com:443/
+    azure redis cache: https://myrediscache.redis.cache.windows.net
+    azure cdn:         https://mycdn.azureedge.net/<myPublicContainer>/<BlobName>
+    Traffic Manager:   https://mytrmanager.trafficmanager.net
+    Microsoft Graph:   https://graph.microsoft.com
+    Batch Account:     https://mybatchaccount.eastus.batch.azure.com
+    Azure Container Registry : https://mycontainerregistry.azurecr.io
+    Graph API:         https://graph.microsoft.com
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Web Apps, Azure Functions
+
+        #Traffic Manager Routing Methods
+            -Priority    - Distribute users to a specific app.
+            -Weighted    - Distribute traffic across apps according to weights that you define
+            -Performance - Route users to the “closest” app location based on latency
+            -Geographic  - Route users to specific app locations based on their current location
+
+        # create an App Service plan
+        az appservice plan create --name $webappname --resource-group myResourceGroup --sku FREE
+        # create a Web App
+        az webapp create --name $webappname --resource-group myResourceGroup --plan $webappname
+        # create a Web App using the UP Command
+        az webapp up --location eastus --name az204demo22 --html
+
+        # Create new Web App using PowerShell
+        New-AzWebApp -Name $webappname -Location $location -AppServicePlan $webappname -ResourceGroupName myResourceGroup
+
+        # create a Web App slot
+        az webapp deployment slot create --name $webappname --resource-group myResourceGroup --slot staging
+        az webapp deployment slot swap --resource-group myResourceGroup --name $webappname --slot staging --target-slot production
+        # create a Web App slot using PowerShell
+        New-AzWebAppSlot -ResourceGroupName myResourceGroup -Name $webappname -Slot staging -AppServicePlan <appserviceplanname>
+
+        #Updating app runtimes
+        az webapp config set --linux-fx-version "DOTNETCORE|3.1" --resource-group myResourceGroup --name $webappname
+
+        #Find outbound IP addresses
+        az webapp show --resource-group myResourceGroup --name $webappname --query outboundIpAddresses --output tsv
+
+        #Swagger
+        #Swashbuckle is the library I need for Swagger and the C# code
+        services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "Azurestream API",
+                    Description = "Application Documentation"
+                });
+
+                // Add XML comment document by uncommenting the following
+                // var filePath = Path.Combine(PlatformServices.Default.Application.ApplicationBasePath, "MyApi.xml");
+                // options.IncludeXmlComments(filePath);
+
+            });
+
+        #Inbound and Outbound IPs when they change:
+        Inbound:
+            When you delete an app and recreate it
+            When you delete the last app in a resource group
+            When you delete an existing SSL binding
+        Outbound:
+            When you scale from a lower tier (Basic, Standard, Premium) to the Premium V2 tier
+
+
+        #Autoscale patterns
+            -Scale based on CPU
+            -Scale differently on weekdays vs. weekends
+            -Scale differently during holidays
+            -Scale based on custom metric
+
+        #Settings that are swapped:
+            General settings, such as framework version, 32/64-bit, web sockets
+            App settings (can be configured to stick to a slot)
+            Connection strings (can be configured to stick to a slot)
+            Handler mappings
+            Public certificates
+            WebJobs content
+            Hybrid connections *
+            Virtual network integration *
+            Service endpoints *
+            Azure Content Delivery Network *
+
+        #Settings that aren't swapped:
+            Publishing endpoints
+            Custom domain names
+            Non-public certificates and TLS/SSL settings
+            Scale settings
+            WebJobs schedulers
+            IP restrictions
+            Always On
+            Diagnostic log settings
+            Cross-origin resource sharing (CORS)
+
+         #WebJobs
+            .cmd, .bat, .exe (using Windows cmd)
+            .ps1 (using PowerShell)
+            .sh (using Bash)
+            .php (using PHP)
+            .py (using Python)
+            .js (using Node.js)
+            .jar (using Java)
+
+        #Function App Files
+            run.csx - your code
+            function.json - your bindings
+
+        #Azure Functions Binding Configuration
+        {
+            "bindings": [
+                {
+                    "name": "order",
+                    "type": "queueTrigger",
+                    "direction": "in",
+                    "queueName": "myqueue-items",
+                    "connection": "MY_STORAGE_ACCT_APP_SETTING"
+                },
+                {
+                    "name": "$return",
+                    "type": "table",
+                    "direction": "out",
+                    "tableName": "outTable",
+                    "connection": "MY_TABLE_STORAGE_ACCT_APP_SETTING"
+                }
+            ]
+        }
+
+        #Durable Functions - Remember these two things
+            DurableOrchestrationContext - your orchestrator
+            CallActivityAsync           - your activities
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Storage Accounts
+    New-AzStorageAccount
+    New-AzStorageShare
+    New-AzStorageAccountSASToken
+    New-AzStorageBlobSASToken
+
+    #Storage Account URI String(s)
+    #Blob service: http://mystorageaccount.blob.core.windows.net
+    #Table service: http://mystorageaccount.table.core.windows.net
+    #Queue service: http://mystorageaccount.queue.core.windows.net
+    #File service: http://mystorageaccount.file.core.windows.net
+
+    #Example File service: http://mystorageaccount.file.core.windows.net ? sv=2018-03-28&ss=bfqt&srt=sco&sp=rl&st=2019-06-13T17%3A27%3A37Z&se=2019-06-14T17%3A27%3A37Z&sig=cgrh6mRsvIs4e%2FKD2%2BQcDKjWTL%2BThBTaYWwNBDoGaCs%3D
+
+    #Storage durability options
+        -LRS     -Three replicas, one region
+        -ZRS     -Three replicas, three zones, one region
+        -GRS     -Six replicas, two regions (three per region)
+        -RA-GRS  -GRS + read access to secondary - 6 copies - 3 copies in east - 3 copies in west - west regions is read only
+        -GZRS    -4 replicas, 3+1 zones, two regions
+        -RA-GZRS -GZRS + read access to secondary
+
+    #Access tiers
+        -Hot
+        -Cold
+        -Archive
+
+    #Lifecycle Management Schema
+    {
+        "rules": [
+            {
+                "name": "rule1",
+                "enabled": true,
+                "type": "Lifecycle",
+                "definition": { ... }
+            },
+            {
+                "name": "rule2",
+                "type": "Lifecycle",
+                "definition": { ... }
+            }
+        ]
+    }
+
+
+    #Container permissions
+        Container - Full public read access - Enumerate container blobs - Read individual blobs - Cannot enumerate containers
+        Blobs     - Public read access for blobs only - Read individual blobs
+        Private   - No public read access - No access to blobs, containers, or enumerating contents
+
+    #C-Sharp - Blobs
+        CloudBlobClient client = storageAccount.CreateCloudBlobClient();
+        CloudBlobContainer container = client.GetContainerReference("images");
+        container.CreateIfNotExists();
+        await container.FetchAttributesAsync();
+        container.Properties.*
+
+    #Lease Blob operation
+        -Acquire
+        -Renew
+        -Change
+        -Release
+        -Break (end the lease but prevent other clients from acquiring a new lease)
+
+    #SAS
+        #Account level SAS, full permissions
+        New-AzStorageAccountSASToken -Service Blob,File,Table,Queue -ResourceType Service,Container,Object -Permission "racwdlup"
+        #Blob level SAS, full permissions
+        New-AzStorageBlobSASToken -Container ContainerName -Blob BlobName -Permission rwd
+        #Example
+        https://myaccount.blob.core.windows.net/sascontainer/sasblob.txt?sv=2012-02-12&st=2013-04-29T22%3A18%3A26Z&se=2013-04-30T02%3A23%3A26Z&sr=b&sp=rw&sig=Z%2FRHIX5Xcg0Mq2rqI3OlWTjEg2tYkboXr1P9ZUXDtkk%3
+
+    #AzCopy Syntax
+        #(Note: Available on Windows, Linux, and MacOS)
+        AzCopy /Source:<source> /Dest:<destination> [Options]
+        AzCopy /Source:https://myaccount.blob.core.windows.net/sourceContainer/ /Dest:https://myaccount2.blob.core.windows.net/destContainer/ /SourceKey:key1 /DestKey:key2 /Pattern:ab /SyncCopy
+
+    #---------------------------------------------------------------------------------------------------------
+    #CosmosDB
+        #Consistency levels
+            -Strong
+            -Bounded Staleness
+            -Session
+            -Consistent Prefix
+            -Eventual – This tier has the best performance
+
+        #Cosmos DB can be accessed by using five different APIs
+            -SQL API
+            -MongoDB API
+            -Table API
+            -Gremlin API
+            -Cassandra API
+
+        #C-Sharp
+        CosmosClient client = new CosmosClient(endpoint, key);
+        string databaseName = "DemoDatabase";
+        Database database = await client.CreateDatabaseIfNotExistsAsync(databaseName,throughput: 10000); 
+        Container container = client.GetContainer(databaseName, collectionName);
+
+        #COSMOSDB .Net packages that you need
+	    #dotnet add package Microsoft.Azure.Cosmos
+	    #Use the following namespaces:
+	    Microsoft.Azure.Cosmos
+	    Microsoft.Azure.Cosmos.Linq
+
+
+        #SQL Database Copy
+        New-AzureRmSqlDatabaseCopy `
+            -ResourceGroupName "myResourceGroup" `
+            -ServerName $sourceserver `
+            -DatabaseName "MySampleDatabase" `
+            -CopyResourceGroupName "myResourceGroup" `
+            -CopyServerName $targetserver `
+            -CopyDatabaseName "CopyOfMySampleDatabase"
+
+    #---------------------------------------------------------------------------------------------------------
+    #Virtual Machines
+
+        New-AzVMConfig
+        New-AzVM -ResourceGroupName myResourceGroupVM -Location EastUS -VM $vm
+
+        New-AzVm `
+            -ResourceGroupName "Demo2" `
+            -Name "myVM" `
+            -Location "East US" `
+            -VirtualNetworkName "myVnet" `
+            -SubnetName "mySubnet" `
+            -SecurityGroupName "myNetworkSecurityGroup" `
+            -PublicIpAddressName "myPublicIpAddress" `
+            -OpenPorts 80,3389
+
+        az vm restart -g MyResourceGroup -n MyVm
+
+        #Accessing an Azure VM by using PowerShell
+        Get-AzPublicIpAddress -ResourceGroupName "myResourceGroup" | Select "IpAddress"
+
+        #Finding image sources by using Azure PowerShell
+        # Get a list of all publishers available in the East US region
+        Get-AzVMImagePublisher -Location eastus
+        # Get a list of all offers for the Canonical publisher
+        Get-AzVMImageOffer -Location eastus -PublisherName Canonical
+        # Get a list of SKUs for the UbuntuServer offer
+        Get-AzVMImageSku -Location eastus -PublisherName Canonical -Offer UbuntuServer
+        # Get a list of all images available for the 19.10-DAILY SKU
+        Get-AzVMImage -Location eastus -PublisherName Canonical -Offer UbuntuServer -Sku 19.10-DAILY
+
+        #Configuring Azure Key Vault to encrypt VM disks
+            #There are three policies that you can enable:
+                -Disk Encryption – Required for Azure Disk Encryption
+                -Deployment – Access secrets during deployment
+                -Template Deployment – Access secrets in Resource Manager templates
+
+            #Create Azure Key Vault by using Azure CLI and Enable VM Disk Encryption
+            az keyvault create --name "myKeyVault" --resource-group <resource-group> --location <location> --enabled-for-disk-encryption True
+
+        #Image Uniform Resource Name (URN)
+        #Short-hand string to quickly access a known VM image Format
+            PUBLISHER:OFFER:SKU:VERSION
+
+    #---------------------------------------------------------------------------------------------------------
+    #Azure Batch
+
+        #Creating Batch account with Azure CLI
+        az batch account create --name mybatchaccount --storage-account mystorageaccount --resource-group myResourceGroup --location eastus2
+        az batch account login --name mybatchaccount --resource-group myResourceGroup --shared-key-auth
+
+        #Creating Batch pools and jobs with Azure CLI
+        az batch pool create --id mypool --vm-size Standard_A1_v2 --target-dedicated-nodes 2 --image canonical:ubuntuserver:16.04-LTS --node-agent-sku-id "batch.node.ubuntu 16.04"
+        az batch pool show --pool-id mypool --query "allocationState"
+        az batch job create --id myjob --pool-id mypool
+
+        #Running Batch jobs with Azure CLI
+        for i in {1..4}
+        do
+            az batch task create --task-id mytask$i --job-id myjob --command-line "/bin/bash -c 'printenv | grep AZ_BATCH; sleep 90s'"
+        done
+
+        az batch task show --job-id myjob --task-id mytask1
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Docker, Azure Container Registry, Azure Container Instances, Azure Kubernetes Service
+
+        #Retrieving a new container image from Docker Hub
+            # Get Ubuntu container image
+            docker pull ubuntu
+            # Get version 5.7 of MySQL container image
+            docker pull mysql:5.7
+            # Get the latest version of the nginx container image
+            docker pull nginx:latest
+
+        #Running the retrieved container image
+            # Get the .NET application sample container image
+            docker pull mcr.microsoft.com/dotnet/core/samples:dotnetapp
+            # Run your container locally
+            docker run mcr.microsoft.com/dotnet/core/samples:dotnetapp
+            # View running containers
+            docker container ls -a
+
+        #Building the container image
+            # Build your container
+            docker build ./application -t tutorial-app
+            # After building, use the following command to view your new container image
+            docker images
+
+        #Running the custom container image as a container
+            # Run your container locally
+            docker run -d -p 8080:80 tutorial-app
+            # View running containers
+            docker container ls -a
+
+        #Create a container registry by using Azure CLI
+            # Create a Container Registry instance
+            az acr create --resource-group <group> --name <acr-name> --sku Basic
+            # Login to Container Registry
+            az acr login --name <acrName>
+
+        #Build a Docker image for Container Registry
+            # Pull existing Docker image
+            docker pull microsoft/aci-helloworld
+            # Obtain the full login server name of the Container Registry instance
+            az acr list --resource-group <group> --query "[].{acrLoginServer:loginServer}" --output table
+            # Tag image with full login server name prefix
+            docker tag microsoft/aci-helloworld <acrLoginServer>/aci-helloworld:v1
+            # Push image to Container Registry
+            docker push <acrLoginServer>/aci-helloworld:v1
+
+        #Deploy a container to Container Instances
+            # Get name of container registry login server
+            az acr show --name <acrName> --query loginServer
+            # Get container registry password
+            az acr credential show --name <acrName> --query "passwords[0].value"
+            # Deploy container
+            az container create --resource-group myResourceGroup --name aci-tutorial-app --image <acrLoginServer>/aci-tutorial-app:v1 --cpu 1 --memory 1 --registry-login-server <acrLoginServer> --registry-username <acrName> --registry-password <acrPassword> --dns-name-label <aciDnsLabel> --ports 80
+
+        #Azure Kubernetes Service
+            # Get a list of cluster nodes
+            kubectl get nodes
+            # Run the application
+            kubectl apply -f example.yaml
+            # Monitor progress of the deployment
+            kubectl get service nginx-deployment -watch
+            # View pods related to this deployment
+            kubectl get pods -l app=nginx
+
+    #---------------------------------------------------------------------------------------------------------
+    #Authorization & authentication
+
+        #Authentication flows
+        #Different authentication flows provided by Microsoft Authentication Library (MSAL).
+        #These flows can be used in a variety of different application scenarios.
+            Flow	            Description
+            Authorization code	Native and web apps securely obtain tokens in the name of the user
+            Client credentials	Service applications run without user interaction
+            On-behalf-of	    The application calls a service/web API, which in turns calls Microsoft Graph
+            Implicit	        Used in browser-based applications
+            Device code	        Enables sign-in to a device by using another device that has a browser
+            Integrated Windows	Windows computers silently acquire an access token when they are domain joined
+            Interactive	        Mobile and desktops applications call Microsoft Graph in the name of a user
+            Username/password	The application signs in a user by using their username and password
+
+        #Authentication endpoints
+            -Multitenant applications (the same for all tenants): https://login.microsoftonline.com/common
+            -Single-tenant applications (tenant-specific):        https://login.microsoftonline.com/contoso.onmicrosoft.com
+
+        #Important Protocols that Azure AD Supports
+        Websites - WS-Federation - SAMLP - OpenID Connect
+        Native Apps - Authorization Code Grant Flow
+        SPA - OAUTH2 Implicit Flow
+        Mobile Apps - Proof of Key exchange (PKCE) flow
+
+        #Common authentication flows
+        Interactive:
+        User authenticates by using a web browser
+        On-Behalf-Of:
+        Application authenticates on behalf of a user
+        Client credentials:
+        Application authenticates by using pre-generated credentials
+        Device code:
+        User authenticates on another device
+
+
+        #Authentication providers
+        Authorization code - Native and web apps securely obtain tokens in the name of the user
+        Client Credentials - Service applications run without user interaction
+        On-Behalf-of       - The application calls a service/web API, which in turns calls Microsoft Graph
+        Implicit           - Used in browser-based applications
+        Device code        - Enables sign-in to a device by using another device that has a browser
+        Integrated Windows - Windows computers silently acquire an access token when they are domain joined
+        Interactive        - Mobile and desktops applications call Microsoft Graph in the name of a user
+        Username/password  - The application signs in a user by using their username and password
+
+        #Creating an authentication context by using MSAL
+        string tenant = "contoso.onmicrosoft.com";
+        string clientId = "00000000-0000-0000-0000-000000000000";
+        string authority = $"https://login.microsoftonline.com/{tenant}";
+
+        // Create MSAL context using AAD authority
+        var clientApp = PublicClientApplicationBuilder.Create(clientId)
+            .WithAuthority(AzureCloudInstance.AzurePublic, tenant)
+            .Build();
+
+        #Microsoft Graph SDK
+            Microsoft.Graph -
+            Microsoft.Graph.Auth
+
+        #Microsoft Get Operations
+        GET: /users/mads
+        {
+            "displayName": "Mads Bjerregaard",
+            "jobTitle": "Senior Program Manager"
+        }
+
+
+        GET: /users/mads/photo/$value
+        Stream image/jpeg
+
+
+        GET: /users/mads/manager
+        { "displayName": "Amalia Horvath", … }
+
+
+        GET: /users/mads/directReports
+        "value": [
+            { "displayName": "Gyorgy", … },
+            { "displayName": "Penny", … }
+        ]
+
+
+        GET: /me/memberOf
+        "value" : [
+            { "displayName": "Contoso Recreation", … },
+            { "displayName": "Graph PM team", … }
+        ]   
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Security
+
+        #Key Vault authentication
+            -Managed identity:
+                Assigned identity for an Azure resource
+                Fastest way to access the vault from a service without sharing or exposing credentials
+            -Service principal:
+                Can provide certificate or secret
+                Not recommended as it’s difficult to rotate
+
+        #Create Key Vault secret by using Azure CLI
+            # Create resource group
+            az group create --name SecurityGroup --location westus
+            # Create Key Vault resource
+            az keyvault create --name contosovault --resource-group SecurityGroup --location westus
+            # Set secret in Key Vault
+            az keyvault secret set --vault-name contosovault --name DatabasePassword --value 'Pa5w.rd’
+            # Show value of secret in Key Vault
+            az keyvault secret show --vault-name contosovault --name DatabasePassword
+
+        #Managed identities
+            System-assigned
+                -Created as part of an Azure resource (for example, an Azure virtual machine or Azure App Service)
+                -Shares a lifecycle with the assigned Azure resource
+                -When the parent resource is deleted, the managed identity is deleted as well
+                -Cannot be shared
+                -Can only be associated with a single Azure resource
+
+            User-assigned
+                -Created as a standalone Azure resource
+                -Has an independent lifecycle
+                -Must be explicitly deleted
+                -Can be shared
+                -The same user-assigned managed identity can be associated with more than one Azure resource
+
+        #Configure managed identities for Web Apps by using Azure CLI
+        az web app identity assign --name <app-name> --resource-group <resource-group>
+
+        #Assign managed identity by using Azure CLI
+        az container create --resource-group <resource-group> --name <container-name> --assign-identity $resourceID --image microsoft/azure-cli
+
+        #Create user-assigned managed identity by using Azure CLI
+        az identity create --resource-group <resource-group> --name <identity-name> resourceID=$(az identity show --resource-group <resource-group> --name <identity-name> --query id --output tsv)
+
+        #Assign managed identity by using Azure CLI
+        az container create --resource-group <resource-group> --name <container-name> --assign-identity $resourceID --image microsoft/azure-cli
+
+        #Azure Active Directory - Consumption based billing
+        Per user. You can pay per user. Each user has unlimited authentications. Use this model if you know how many users you have and can accurately estimate your costs.
+        Per authentication. You can pay for a bundle (10) of authentications. Use this model when you are unsure how many users will participate in MFA authentication.
+
+    #---------------------------------------------------------------------------------------------------------
+    #API Management
+
+        #Policy scopes
+            <policies>
+                <inbound>
+                    <cross-domain />
+                    <base />
+                    <find-and-replace from="xyz" to="abc" />
+                </inbound>
+            </policies>
+
+        #Advanced policy scenarios – control flow
+        <choose>
+            <when condition="Boolean expression | Boolean constant">
+                <!-- one or more policy statements to be applied if the above condition is true -->
+            </when>
+            <when condition="Boolean expression | Boolean constant">
+                <!-- one or more policy statements to be applied if the above condition is true -->
+            </when>
+            <otherwise>
+                <!-- one or more policy statements to be applied if none of the above conditions are true -->
+            </otherwise>
+        </choose>
+
+        #Limit concurrency
+        <limit-concurrency key="expression" max-count="number">
+            <!-- nested policy statements -->
+        </limit-concurrency>
+
+        #Mock response
+        <mock-response status-code="code" content-type="media type"/>
+
+        #Retry
+        <retry
+            condition="boolean expression or literal"
+            interval="retry interval in seconds"
+            max-interval="maximum retry interval in seconds"
+            delta="retry interval delta in seconds"
+            count="number of retry attempts">
+                <!-- One or more child policies. No restrictions -->
+        </retry>
+
+        #Return response
+        <return-response response-variable-name="existing context variable">
+            <set-header/><set-body/><set-status/>
+        </return-response>
+
+    #---------------------------------------------------------------------------------------------------------
+    #Event Grid
+
+        #Schema
+        [
+            {
+                "topic": string,
+                "subject": string,
+                "id": string,
+                "eventType": string,
+                "eventTime": string,
+                "data":{
+                    object-unique-to-each-publisher
+                },
+                "dataVersion": string,
+                "metadataVersion": string
+            }
+        ]
+
+        #Example - Schema – Azure Blob storage event
+        [{
+            "topic": "...", "subject": "...",
+            "eventType": "Microsoft.Storage.BlobCreated",
+            "eventTime": "2017-06-26T18:41:00.9584103Z",
+            "id": "831e1650-001e-001b-66ab-eeb76e069631",
+            "data": {
+                "api": "PutBlockList", "eTag": "0x8D4BCC2E4835CD0",
+                "storageDiagnostics": { "batchId": "b68529f3-68cd-4744-baa4-3c0498ec19f0" },
+                "clientRequestId": "6d79dbfb-0e37-4fc4-981f-442c9ca65760",
+                "requestId": "831e1650-001e-001b-66ab-eeb76e000000",
+                "contentType": "application/octet-stream", "contentLength": 524288,
+                "blobType": "BlockBlob", "sequencer": "00000000000004420000000000028963",
+                "url": "https://test.blob.core.windows.net/container/blob"
+            },
+            "dataVersion": "", "metadataVersion": "1"
+        }]
+
+        #Authoring custom events
+            # creates a resource group named gridResourceGroup in the westus2 location
+            az group create --name gridResourceGroup --location westus2
+            # register the provider and check the status
+            az provider register --namespace Microsoft.EventGrid
+            az provider show --namespace Microsoft.EventGrid --query "registrationState"
+            # replace <your-topic-name> with a unique name for the topic
+            topicname=<your-topic-name>
+            # create the custom topic
+            az eventgrid topic create --name $topicname -l westus2 -g gridResourceGroup
+            # replace <your-site-name> with a unique name for your web app.
+            sitename=<your-site-name>
+            # subscribe to the custom topic
+            az eventgrid event-subscription create -g gridResourceGroup --topic-name $topicname --name demoViewerSub --endpoint https://$sitename.azurewebsites.net/api/updates
+
+    #---------------------------------------------------------------------------------------------------------
+    #Event Hubs
+
+        #Creating a namespace manager by using the root key
+            // Create namespace manager.
+            string serviceNamespace = "YOUR_NAMESPACE";
+            string namespaceManageKeyName = "RootManageSharedAccessKey";
+            string namespaceManageKey = "YOUR_ROOT_MANAGE_SHARED_ACCESS_KEY";
+            Uri uri = ServiceBusEnvironment.CreateServiceUri("sb", serviceNamespace, string.Empty);
+            TokenProvider td = TokenProvider.CreateSharedAccessSignatureTokenProvider(namespaceManageKeyName, namespaceManageKey);
+            NamespaceManager nm = new NamespaceManager(namespaceUri, namespaceManageTokenProvider);
+
+        #Protocols to Remember
+        Protocol	Ports	Details
+        AMQP	5671 and 5672	See AMQP protocol guide
+        HTTP, HTTPS	80, 443
+        Kafka	9093	See Use Event Hubs from Kafka applications
+
+    #---------------------------------------------------------------------------------------------------------
+    #Notification Hubs
+
+         Push Notification PlatformServices
+            IOS
+            Android
+            Windows
+            Kindle
+            Baidu
+
+        #Notification payload example
+        // send Hello! Using APNS (Apple)
+        {"aps": {"alert" : "Hello!" }}
+
+        // send Hello! Using MPNS (Windows)
+        <toast>
+            <visual>
+                <binding template=\"ToastText01\">
+                    <text id=\"1\">Hello!</text>
+                </binding>
+            </visual>
+        </toast>
+
+        #Registration template example
+        // platform-independent message
+        message = Hello!
+
+        // APNS template (Apple)
+        {"aps": {"alert": "$(message)"}}
+
+        // MPNS template (Windows)
+        <toast>
+            <visual>
+                <binding template=\"ToastText01\">
+                    <text id=\"1\">$(message)</text>
+                </binding>
+            </visual>
+        </toast>
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Azure Storage Queues
+
+        #C-Sharp
+        // connection string in application’s configuration file
+        <add key="StorageConnectionString" value="DefaultEndpointsProtocol=https;AccountName=storagesample;AccountKey=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+        // create instance of CloudStorageAccount class
+        CloudStorageAccount account = CloudStorageAccount.Parse("StorageConnectionString");
+        // create queue client
+        CloudQueueClient queueClient = account.CreateCloudQueueClient();
+        // retrieve reference to queue
+        CloudQueue queue = queueClient.GetQueueReference("myqueue");
+        // Create the queue if it doesn't already exist
+        queue.CreateIfNotExists();
+
+
+    #---------------------------------------------------------------------------------------------------------
+    #Azure Monitor, Application Insights
+
+        #Application Insights SDK
+        Microsoft.ApplicationInsights
+        Microsoft.ApplicationInsights.DependencyCollector
+
+        #Two types of availability tests
+            1. URL ping test       - Simple test that you can create in the Azure portal
+            2. Multi-step web test - Created in Visual Studio Enterprise and uploaded to the portal
+
+
+        #Auditing in Azure PowerShell
+            Get-AzLog -ResourceGroup ExampleGroup
+            Get-AzLog -ResourceGroup ExampleGroup -StartTime 2015-08-28T06:00 -EndTime 2015-09-10T06:00
+            Get-AzLog -ResourceGroup ExampleGroup -StartTime (Get-Date).AddDays(-14)
+            Get-AzLog -ResourceGroup ExampleGroup -StartTime (Get-Date).AddDays(-14) | Where-Object OperationName -eq Microsoft.Web/sites/stop/action
+            Get-AzLog -ResourceGroup deletedgroup -StartTime (Get-Date).AddDays(-14) -Caller someone@contoso.com
+            Get-AzLog -ResourceGroup ExampleGroup -Status Failed
+
+        #Handling transient errors in code
+            int retryCount = 3; readonly TimeSpan delay = TimeSpan.FromSeconds(5);
+            public async Task OperationWithBasicRetryAsync()
+            {
+                int currentRetry = 10;
+                for (;;)
+                {
+                    try
+                    { await TransientOperationAsync(); break; }
+                    catch (Exception ex)
+                    {
+                        Trace.TraceError("Operation Exception");                            
+                        if (currentRetry++; > this.retryCount || !IsTransient(ex))
+                        { throw; }
+                    }
+                    await Task.Delay(delay);
+                }
+            }
+
+        #Detecting if an error is transient
+            private bool IsTransient(Exception ex)
+            {
+                if (ex is OperationTransientException) return true;
+                var webException = ex as WebException;
+                if (webException != null)
+                {
+                    return new[] {
+                        WebExceptionStatus.ConnectionClosed,
+                        WebExceptionStatus.Timeout,
+                        WebExceptionStatus.RequestCanceled                  
+                    }.Contains(webException.Status);
+                }   
+                return false;
+            }
+
+
+        #Log Analytics Query Example that collects all security events
+            SecurityEvent
+            | where Level <> 8
+            | where EventID == 4672
+
+            Heartbeat
+            | where
+            | summarize
+
+        #Log Analytics Query Example that lists VMs with the most error events
+            Event
+            | where (EventLevelName == "Error")
+            | where (TimeGenerated > ago (1days))
+            | summarize ErrorCount = count() by Computer
+            | top 10 by ErrorCount desc
+
+        #Log Analytics Important Tables to Remember
+            Perf
+            Syslog - Linux Machines Table
+            Event
+            Heartbeat
+
+        #Log Analytics Query Syntax - KQL
+
+    #---------------------------------------------------------------------------------------------------------
+    #Redis Cache, CDN
+
+        #Redis Cache Offers three tiers of service:
+            Basic
+            -Includes a single node
+            Standard
+            -Includes two nodes in the primary replica configuration, and includes replication support and a Service Level Agreement (SLA)
+            Premium
+            -Designed for enterprises with scale-out cache support and advanced persistence and clustering features
+
+        #Redis Cache - Here’s a list of the most common data types:
+            -Binary-safe strings (most common)
+            -Lists of strings
+            -Unordered sets of strings
+            -Hashes
+            -Sorted sets of strings
+            -Maps of strings
+
+        #Redis Operations
+            GET school:metadata:name
+                -Retrieves the value associated with any key
+                -If the key does not exist, the command will return a special nil (null) value
+            SET school:metadata:name "School of Fine Art"
+                -Changes the value associated with the specified key
+            GETSET school:metadata:name "Bellows College"
+                -Changes the value associated with the specified key
+                -Returns the previously associated value
+            EXISTS school:metadata:name
+                -Takes one or more keys as parameters
+                -Returns an integer indicating the quantity of keys that have associated values
+
+
+        #Azure CDN Create CLI
+            az cdn profile create --name DemoProfile --resource-group ExampleGroup –sku Standard_Akamai
+            #Create a CDN endpoint
+            az cdn endpoint create --name ContosoEndpoint --origin www.contoso.com --profile-name DemoProfile --resource-group ExampleGroup
+            #Purge CDN
+            az cdn endpoint purge --content-paths '/css/*' '/js/app.js' --name ContosoEndpoint --profile-name DemoProfile --resource-group ExampleGroup
